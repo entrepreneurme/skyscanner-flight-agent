@@ -1,0 +1,76 @@
+{
+  "content": {
+    "results": {
+      "quotes": {
+        "q1": {
+          "minPrice": {"amount": "199.0"},
+          "isDirect": false,
+          "outboundLeg": {
+            "originPlaceId": "95673383",
+            "destinationPlaceId": "95565050",
+            "departureDateTime": {"year": 2026, "month": 6, "day": 12},
+            "marketingCarrierId": "c1"
+          }
+        },
+        "q2": {
+          "minPrice": {"amount": "450.0"},
+          "isDirect": true,
+          "outboundLeg": {
+            "originPlaceId": "95673383",
+            "destinationPlaceId": "95566066",
+            "departureDateTime": {"year": 2026, "month": 6, "day": 15},
+            "marketingCarrierId": "c2"
+          }
+        }
+      },
+      "places": {
+        "95673383": {
+          "entityId": "95673383",
+          "name": "Delhi",
+          "iata": "DEL",
+          "type": "PLACE_TYPE_CITY",
+          "parentId": "29475224"
+        },
+        "29475224": {
+          "entityId": "29475224",
+          "name": "India",
+          "iata": "IN",
+          "type": "PLACE_TYPE_COUNTRY",
+          "parentId": "29475224"
+        },
+        "95565050": {
+          "entityId": "95565050",
+          "name": "Barcelona",
+          "iata": "BCN",
+          "type": "PLACE_TYPE_CITY",
+          "parentId": "29475375"
+        },
+        "29475375": {
+          "entityId": "29475375",
+          "name": "Spain",
+          "iata": "ES",
+          "type": "PLACE_TYPE_COUNTRY",
+          "parentId": "29475375"
+        },
+        "95566066": {
+          "entityId": "95566066",
+          "name": "Bangkok",
+          "iata": "BKK",
+          "type": "PLACE_TYPE_CITY",
+          "parentId": "29475330"
+        },
+        "29475330": {
+          "entityId": "29475330",
+          "name": "Thailand",
+          "iata": "TH",
+          "type": "PLACE_TYPE_COUNTRY",
+          "parentId": "29475330"
+        }
+      },
+      "carriers": {
+        "c1": {"name": "Example Air"},
+        "c2": {"name": "Direct Co"}
+      }
+    }
+  }
+}

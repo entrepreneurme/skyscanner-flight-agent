@@ -1,0 +1,26 @@
+# Copy to config.yaml and edit
+market: IN
+locale: en-GB
+currency: INR
+
+origins:
+  - DEL
+  - BOM
+  - BLR
+
+destinations:
+  mode: anywhere
+  continents:
+    - Europe
+    - Southeast Asia
+
+dates:
+  mode: range
+  start: 2026-06
+  end: 2026-09
+
+trip:
+  type: one_way
+
+output:
+  top: 30
