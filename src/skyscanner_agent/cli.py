@@ -13,7 +13,13 @@ from rich.table import Table
 from skyscanner_agent.agent import FlightSearchAgent
 from skyscanner_agent.client import SkyscannerClient
 from skyscanner_agent.config_loader import config_from_dict, load_search_config
-from skyscanner_agent.models import DateMode, DestinationMode, MonthYear, SearchConfig, TripType
+from skyscanner_agent.models import SearchConfig, TripType
+from skyscanner_agent.window_search import (
+    DEFAULT_DESTINATION_GROUPS,
+    DEFAULT_INDIA_ORIGINS,
+    RoundTripWindowSearch,
+    build_default_windows,
+)
 
 console = Console()
 
@@ -69,6 +75,28 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["one_way", "return"],
         default="one_way",
         help="One-way or return indicative search",
+    )
+
+    trips = sub.add_parser(
+        "search-trips",
+        help="Round-trip search with Thu/Fri out and Sun/Mon back (9–11 days)",
+    )
+    trips.add_argument("--year", type=int, default=2027, help="Travel year (default 2027)")
+    trips.add_argument(
+        "--windows-per-month",
+        type=int,
+        default=2,
+        help="Sample N departure windows per month to limit API calls (0 = all)",
+    )
+    trips.add_argument("--market", default="IN")
+    trips.add_argument("--locale", default="en-GB")
+    trips.add_argument("--currency", default="INR")
+    trips.add_argument("--top", type=int, default=15, help="Top deals per destination region")
+    trips.add_argument("--json", action="store_true")
+    trips.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show trip windows and API call count without calling Skyscanner",
     )
 
     sub.add_parser("example-config", help="Print an example YAML config to stdout")
@@ -166,6 +194,90 @@ def render_table(quotes) -> None:
     console.print(table)
 
 
+def render_trip_table(results) -> None:
+    table = Table(title="Round-trip deals (Thu/Fri → Sun/Mon, 9–11 days)")
+    table.add_column("Region")
+    table.add_column("Price", justify="right")
+    table.add_column("From")
+    table.add_column("To")
+    table.add_column("Outbound")
+    table.add_column("Return")
+    table.add_column("Days", justify="right")
+    for row in results:
+        q = row.quote
+        table.add_row(
+            row.destination_group,
+            f"{q.currency} {q.price_amount:,.0f}",
+            q.origin_code,
+            f"{q.destination_code} ({q.destination_name})",
+            q.outbound_date or "-",
+            q.inbound_date or "-",
+            str(row.trip_days),
+        )
+    console.print(table)
+
+
+def cmd_search_trips(args: argparse.Namespace) -> int:
+    sample = args.windows_per_month if args.windows_per_month > 0 else None
+    windows = build_default_windows(year=args.year, sample_per_month=sample)
+    n_dest_queries = sum(len(v) for v in DEFAULT_DESTINATION_GROUPS.values())
+    api_calls = len(DEFAULT_INDIA_ORIGINS) * n_dest_queries * len(windows)
+
+    if args.dry_run:
+        console.print(
+            f"[bold]Planned indicative API calls:[/bold] {api_calls} "
+            f"({len(DEFAULT_INDIA_ORIGINS)} origins × {n_dest_queries} destination lookups × "
+            f"{len(windows)} date windows)"
+        )
+        console.print(f"Sample windows ({len(windows)}):")
+        for w in windows[:8]:
+            console.print(
+                f"  {w.outbound.isoformat()} ({w.outbound.strftime('%a')}) → "
+                f"{w.inbound.isoformat()} ({w.inbound.strftime('%a')}), {w.trip_days}d"
+            )
+        if len(windows) > 8:
+            console.print("  …")
+        return 0
+
+    config = SearchConfig(
+        market=args.market,
+        locale=args.locale,
+        currency=args.currency,
+        origins=DEFAULT_INDIA_ORIGINS,
+        trip_type=TripType.RETURN,
+        top_n=args.top,
+    )
+    api_key = (args.api_key or os.environ.get("SKYSCANNER_API_KEY", "")).strip()
+    with SkyscannerClient(api_key) as client:
+        agent = FlightSearchAgent(client)
+        searcher = RoundTripWindowSearch(client, agent)
+        results = searcher.search(config=config, windows=windows)
+
+    if args.json:
+        payload = [
+            {
+                "region": r.destination_group,
+                "price": r.quote.price_amount,
+                "currency": r.quote.currency,
+                "origin": r.quote.origin_code,
+                "destination": r.quote.destination_code,
+                "destination_name": r.quote.destination_name,
+                "outbound": r.quote.outbound_date,
+                "return": r.quote.inbound_date,
+                "trip_days": r.trip_days,
+                "carrier": r.quote.carrier_name,
+            }
+            for r in results
+        ]
+        print(json.dumps(payload, indent=2))
+    else:
+        if not results:
+            console.print("[yellow]No quotes returned. Check API key and partner access.[/yellow]")
+        else:
+            render_trip_table(results)
+    return 0
+
+
 def cmd_search(args: argparse.Namespace) -> int:
     config = config_from_cli_args(args)
     api_key = (args.api_key or os.environ.get("SKYSCANNER_API_KEY", "")).strip()
@@ -211,6 +323,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "example-config":
         print(example_config_text())
         return 0
+    if args.command == "search-trips":
+        return cmd_search_trips(args)
     if args.command == "search":
         return cmd_search(args)
     parser.error(f"Unknown command {args.command}")

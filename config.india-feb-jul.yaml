@@ -1,0 +1,22 @@
+# India → Japan / Europe / Thailand / Denpasar
+# Round trips: depart Thu or Fri, return Sun or Mon (9–11 nights)
+# Outbound months: February–July (uses 2027 by default via CLI --year)
+
+market: IN
+locale: en-GB
+currency: INR
+
+origins:
+  - BLR   # Bangalore
+  - MAA   # Chennai
+  - TRZ   # Trichy
+  - COK   # Kochi
+  - BOM   # Mumbai
+  - PNQ   # Pune
+  - HYD   # Hyderabad
+
+# Run the tailored round-trip window search:
+#   skyscanner-agent search-trips --dry-run
+#   skyscanner-agent search-trips --year 2027 --windows-per-month 2
+#
+# Europe is searched via major entry countries (cheapest wins per region).
