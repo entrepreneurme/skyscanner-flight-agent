@@ -1,0 +1,27 @@
+interval_hours: 4
+
+# Google Flights is scraped in a real browser — keep batches small to avoid blocks.
+max_jobs_per_run: 24
+delay_between_jobs_sec: 8
+headless: true
+
+year: 2027
+windows_per_month: 1
+
+origins:
+  - BLR
+  - MAA
+  - TRZ
+  - COK
+  - BOM
+  - PNQ
+  - HYD
+
+regions:
+  Japan: Tokyo
+  Thailand: Bangkok
+  Denpasar: Denpasar
+  Europe: Paris
+
+history_path: data/price_history.jsonl
+state_path: data/watch_state.json

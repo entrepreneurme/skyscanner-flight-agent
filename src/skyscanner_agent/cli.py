@@ -14,6 +14,14 @@ from skyscanner_agent.agent import FlightSearchAgent
 from skyscanner_agent.client import SkyscannerClient
 from skyscanner_agent.config_loader import config_from_dict, load_search_config
 from skyscanner_agent.models import SearchConfig, TripType
+from skyscanner_agent.price_store import PriceHistoryStore
+from skyscanner_agent.watch_runner import (
+    build_watch_jobs,
+    load_watch_config,
+    run_watch_batch,
+    run_watch_daemon,
+    select_job_batch,
+)
 from skyscanner_agent.window_search import (
     DEFAULT_DESTINATION_GROUPS,
     DEFAULT_INDIA_ORIGINS,
@@ -97,6 +105,39 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run",
         action="store_true",
         help="Show trip windows and API call count without calling Skyscanner",
+    )
+
+    watch = sub.add_parser(
+        "watch",
+        help="Google Flights browser checks on an interval (no API key)",
+    )
+    watch.add_argument(
+        "-c",
+        "--config",
+        type=Path,
+        default=Path("config.watch.yaml"),
+        help="Watch config YAML",
+    )
+    watch.add_argument(
+        "--once",
+        action="store_true",
+        help="Run one batch and exit (use with cron every 4 hours)",
+    )
+    watch.add_argument(
+        "--daemon",
+        action="store_true",
+        help="Loop forever: batch scrape then sleep interval_hours",
+    )
+    watch.add_argument("--json", action="store_true")
+    watch.add_argument(
+        "--headed",
+        action="store_true",
+        help="Show the browser window (debug captchas / layout)",
+    )
+    watch.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="List jobs in the next batch without opening a browser",
     )
 
     sub.add_parser("example-config", help="Print an example YAML config to stdout")
@@ -278,6 +319,102 @@ def cmd_search_trips(args: argparse.Namespace) -> int:
     return 0
 
 
+def render_watch_table(records, store: PriceHistoryStore) -> None:
+    table = Table(title="Google Flights watch results")
+    table.add_column("Region")
+    table.add_column("From")
+    table.add_column("Dates")
+    table.add_column("Price", justify="right")
+    table.add_column("Δ vs last", justify="right")
+    table.add_column("Airline")
+    table.add_column("Stops")
+    for rec in records:
+        if rec.error:
+            price = f"[red]error[/red]"
+            delta = "-"
+        else:
+            price = rec.cheapest_display or "-"
+            change = store.price_delta(rec)
+            if change is None:
+                delta = "-"
+            elif change < 0:
+                delta = f"[green]{change:,.0f}[/green]"
+            elif change > 0:
+                delta = f"[red]+{change:,.0f}[/red]"
+            else:
+                delta = "0"
+        table.add_row(
+            rec.region,
+            rec.origin,
+            f"{rec.outbound} → {rec.inbound}",
+            price,
+            delta,
+            rec.airline or "-",
+            rec.stops or "-",
+        )
+    console.print(table)
+    console.print(f"History appended to [bold]{store.path}[/bold]")
+
+
+def cmd_watch(args: argparse.Namespace) -> int:
+    if not args.config.exists():
+        raise SystemExit(f"Config not found: {args.config}")
+
+    config = load_watch_config(args.config)
+    if args.headed:
+        config.headless = False
+
+    jobs = build_watch_jobs(config)
+    if args.dry_run:
+        batch, next_index = select_job_batch(jobs, config)
+        console.print(
+            f"[bold]Total jobs:[/bold] {len(jobs)} | "
+            f"[bold]Next batch:[/bold] {len(batch)} | "
+            f"[bold]interval:[/bold] {config.interval_hours}h"
+        )
+        for job in batch[:12]:
+            console.print(
+                f"  {job.origin} → {job.destination_query} ({job.region}) "
+                f"{job.outbound} → {job.inbound}"
+            )
+        if len(batch) > 12:
+            console.print("  …")
+        console.print(f"Next state index after run: {next_index}")
+        return 0
+
+    if args.daemon and args.once:
+        raise SystemExit("Use either --once or --daemon, not both")
+
+    if args.daemon:
+        console.print(
+            f"[bold]Starting watch daemon[/bold] — every {config.interval_hours}h, "
+            f"{config.max_jobs_per_run} routes per batch"
+        )
+        run_watch_daemon(config)
+        return 0
+
+    records = run_watch_batch(config)
+    store = PriceHistoryStore(config.history_path)
+
+    if args.json:
+        payload = []
+        for rec in records:
+            row = rec.__dict__.copy()
+            row["delta"] = store.price_delta(rec)
+            payload.append(row)
+        print(json.dumps(payload, indent=2))
+    else:
+        render_watch_table(records, store)
+        drops = [
+            r
+            for r in records
+            if (delta := store.price_delta(r)) is not None and delta < 0
+        ]
+        if drops:
+            console.print(f"[green]{len(drops)} route(s) dropped since last check.[/green]")
+    return 0
+
+
 def cmd_search(args: argparse.Namespace) -> int:
     config = config_from_cli_args(args)
     api_key = (args.api_key or os.environ.get("SKYSCANNER_API_KEY", "")).strip()
@@ -325,6 +462,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "search-trips":
         return cmd_search_trips(args)
+    if args.command == "watch":
+        return cmd_watch(args)
     if args.command == "search":
         return cmd_search(args)
     parser.error(f"Unknown command {args.command}")

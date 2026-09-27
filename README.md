@@ -112,7 +112,32 @@ flowchart LR
 pytest
 ```
 
-## Limitations
+## Browser watch (no Skyscanner key)
+
+Uses **Google Flights in Chromium** (Playwright). Intended for personal price tracking; Google may rate-limit or change the page layout.
+
+```bash
+pip install -e ".[browser]"
+python3 -m playwright install chromium
+
+# Preview the next batch (rotating queue)
+python3 -m skyscanner_agent.cli watch -c config.watch.yaml --dry-run
+
+# One batch (~24 routes), append to data/price_history.jsonl
+python3 -m skyscanner_agent.cli watch -c config.watch.yaml --once
+
+# Loop: batch → sleep 4 hours → repeat
+python3 -m skyscanner_agent.cli watch -c config.watch.yaml --daemon
+```
+
+**Cron (every 4 hours):**
+
+```cron
+0 */4 * * * cd /agent && /usr/bin/python3 -m skyscanner_agent.cli watch -c config.watch.yaml --once >> data/watch.log 2>&1
+```
+
+Edit `config.watch.yaml` for origins, regions, `max_jobs_per_run`, and `interval_hours`. The runner rotates through all origin × region × Thu/Fri window jobs over multiple cycles.
+
 
 - Requires an approved Skyscanner partner key; without it, API calls will fail.
 - Continents cannot be passed directly to the indicative API; this agent uses **`anywhere`** plus geographic filters (same practical outcome as narrowing Everywhere results).
