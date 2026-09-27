@@ -320,14 +320,14 @@ def cmd_search_trips(args: argparse.Namespace) -> int:
 
 
 def render_watch_table(records, store: PriceHistoryStore) -> None:
-    table = Table(title="Google Flights watch results")
+    table = Table(title="Skyscanner watch results")
     table.add_column("Region")
     table.add_column("From")
-    table.add_column("Dates")
+    table.add_column("Month / dates")
     table.add_column("Price", justify="right")
     table.add_column("Δ vs last", justify="right")
-    table.add_column("Airline")
-    table.add_column("Stops")
+    table.add_column("Destination")
+    table.add_column("Mode")
     for rec in records:
         if rec.error:
             price = f"[red]error[/red]"
@@ -346,11 +346,11 @@ def render_watch_table(records, store: PriceHistoryStore) -> None:
         table.add_row(
             rec.region,
             rec.origin,
-            f"{rec.outbound} → {rec.inbound}",
+            rec.travel_month or f"{rec.outbound} → {rec.inbound}",
             price,
             delta,
-            rec.airline or "-",
-            rec.stops or "-",
+            rec.destination_query[:28] if rec.destination_query else "-",
+            rec.search_mode,
         )
     console.print(table)
     console.print(f"History appended to [bold]{store.path}[/bold]")
@@ -373,10 +373,16 @@ def cmd_watch(args: argparse.Namespace) -> int:
             f"[bold]interval:[/bold] {config.interval_hours}h"
         )
         for job in batch[:12]:
-            console.print(
-                f"  {job.origin} → {job.destination_query} ({job.region}) "
-                f"{job.outbound} → {job.inbound}"
-            )
+            if hasattr(job, "travel_month"):
+                console.print(
+                    f"  {job.origin} → Everywhere ({job.travel_month}) "
+                    f"[explore / anytime-style month]"
+                )
+            else:
+                console.print(
+                    f"  {job.origin} → {job.destination_iata} ({job.region}) "
+                    f"{job.outbound} → {job.inbound}"
+                )
         if len(batch) > 12:
             console.print("  …")
         console.print(f"Next state index after run: {next_index}")

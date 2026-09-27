@@ -1,12 +1,20 @@
 interval_hours: 4
 
-# Google Flights is scraped in a real browser — keep batches small to avoid blocks.
+provider: skyscanner
+# explore_anywhere = Skyscanner "Everywhere" + whole-month (anytime-style) browse
+# roundtrip = fixed outbound/return dates (Thu/Fri → Sun/Mon windows)
+search_mode: explore_anywhere
+
 max_jobs_per_run: 24
-delay_between_jobs_sec: 8
-headless: true
+delay_between_jobs_sec: 10
+headless: false
+
+market_site: skyscanner.co.in
+browser_user_data_dir: data/browser_profile
 
 year: 2027
-windows_per_month: 1
+month_start: 2
+month_end: 7
 
 origins:
   - BLR
@@ -17,11 +25,17 @@ origins:
   - PNQ
   - HYD
 
-regions:
-  Japan: Tokyo
-  Thailand: Bangkok
-  Denpasar: Denpasar
-  Europe: Paris
+filter_regions:
+  - Japan
+  - Europe
+  - Thailand
+  - Denpasar
+
+region_iata:
+  Japan: TYO
+  Thailand: BKK
+  Denpasar: DPS
+  Europe: PARI
 
 history_path: data/price_history.jsonl
 state_path: data/watch_state.json

@@ -24,9 +24,14 @@ class PriceRecord:
     stops: str | None
     url: str
     error: str | None = None
+    provider: str = "skyscanner"
+    search_mode: str = "explore_anywhere"
+    travel_month: str | None = None
 
     def key(self) -> str:
-        return f"{self.origin}|{self.region}|{self.outbound}|{self.inbound}"
+        if self.search_mode == "explore_anywhere":
+            return f"{self.provider}|{self.search_mode}|{self.origin}|{self.region}|{self.travel_month}"
+        return f"{self.provider}|{self.origin}|{self.region}|{self.outbound}|{self.inbound}"
 
 
 class PriceHistoryStore:
@@ -45,6 +50,9 @@ class PriceHistoryStore:
                 continue
             try:
                 row = json.loads(line)
+                row.setdefault("provider", "skyscanner")
+                row.setdefault("search_mode", "roundtrip")
+                row.setdefault("travel_month", None)
                 rec = PriceRecord(**row)
             except (json.JSONDecodeError, TypeError):
                 continue
