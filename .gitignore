@@ -3,6 +3,7 @@ data/
 __pycache__/
 *.py[cod]
 .env
+.git-credentials-personal
 .venv/
 venv/
 dist/
