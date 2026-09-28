@@ -112,37 +112,35 @@ flowchart LR
 pytest
 ```
 
-## Browser watch (no Skyscanner key)
+## Browser watch — Skyscanner Everywhere (no API key)
 
-Uses **Google Flights in Chromium** (Playwright). Intended for personal price tracking; Google may rate-limit or change the page layout.
+Uses **skyscanner.co.in in Chromium** (Playwright): **Everywhere** browse from each origin with **`oym` whole-month** queries (Skyscanner’s anytime-style exploration in the UI).
+
+Skyscanner may show a **CAPTCHA** on automated/datacenter IPs. Set `headless: false` and `browser_user_data_dir: data/browser_profile`, solve CAPTCHA once locally, then scheduled runs reuse cookies.
 
 ```bash
 pip install -e ".[browser]"
 python3 -m playwright install chromium
 
-# Preview the next batch (rotating queue)
 python3 -m skyscanner_agent.cli watch -c config.watch.yaml --dry-run
-
-# One batch (~24 routes), append to data/price_history.jsonl
 python3 -m skyscanner_agent.cli watch -c config.watch.yaml --once
-
-# Loop: batch → sleep 4 hours → repeat
 python3 -m skyscanner_agent.cli watch -c config.watch.yaml --daemon
 ```
 
-**Cron (every 4 hours):**
+Default `search_mode: explore_anywhere` scans **Feb–Jul** per origin and keeps the cheapest match in **Japan / Europe / Thailand / Denpasar**. Use `search_mode: roundtrip` for Thu/Fri → Sun/Mon fixed dates.
+
+**Cron every 4 hours:**
 
 ```cron
-0 */4 * * * cd /agent && /usr/bin/python3 -m skyscanner_agent.cli watch -c config.watch.yaml --once >> data/watch.log 2>&1
+0 */4 * * * cd /agent && python3 -m skyscanner_agent.cli watch -c config.watch.yaml --once >> data/watch.log 2>&1
 ```
 
-Edit `config.watch.yaml` for origins, regions, `max_jobs_per_run`, and `interval_hours`. The runner rotates through all origin × region × Thu/Fri window jobs over multiple cycles.
+## Limitations
 
-
-- Requires an approved Skyscanner partner key; without it, API calls will fail.
-- Continents cannot be passed directly to the indicative API; this agent uses **`anywhere`** plus geographic filters (same practical outcome as narrowing Everywhere results).
-- Indicative prices are not guaranteed live booking prices.
-- Return-trip indicative searches use symmetric date settings on both legs; tune in `config.yaml` as Skyscanner documents for your market.
+- Partner **API** path still needs `SKYSCANNER_API_KEY`; the **browser watcher** does not.
+- Browser automation can break when Skyscanner changes markup; CAPTCHAs require manual intervention.
+- Explore mode uses indicative browse prices, not guaranteed live fares.
+- API: continents cannot be passed directly to indicative search; explore mode filters regions after the Everywhere page loads.
 
 ## License
 
